@@ -1,0 +1,11 @@
+package layouts
+
+import "go-htmx-jobs/internal/templates/constants"
+
+// BasePageLayout wraps every page below the nav. The div id is a swap
+// target (constants.PageLayoutID) — one level finer than #main-content.
+templ BasePageLayout() {
+	<div id={ constants.PageLayoutID } class="page-layout">
+		{ children... }
+	</div>
+}

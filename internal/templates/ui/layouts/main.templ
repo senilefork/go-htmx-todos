@@ -1,0 +1,20 @@
+package layouts
+
+import (
+	"go-htmx-jobs/internal/templates/constants"
+	"go-htmx-jobs/internal/templates/ui/partials"
+)
+
+// MainPageLayout is the chrome: header/nav plus <main id="main-content">.
+// HTMX swaps content INTO #main-content, so nav and header survive
+// navigation without being re-rendered.
+templ MainPageLayout() {
+	@BasePageLayout() {
+		<header class="topbar">
+			@partials.Nav()
+		</header>
+		<main id={ constants.MainContentID } class="main-content">
+			{ children... }
+		</main>
+	}
+}

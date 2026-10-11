@@ -1,0 +1,24 @@
+package pages
+
+import "go-htmx-jobs/pkg/model"
+
+// TodoDetail is fetched from jsonplaceholder /todos/{id} and swapped
+// into #main-content by HTMX.
+templ TodoDetail(todo model.Todo) {
+	<a
+		href="/todos"
+		hx-get="/todos"
+		hx-target="#main-content"
+		hx-push-url="true"
+		class="back-link"
+	>← Back to todos</a>
+	<div class="detail-card">
+		<h1>{ todo.Title }</h1>
+		<p class="subtitle">Todo #{ todo.ID } · user { todo.UserID }</p>
+		if todo.Completed {
+			<span class="badge closed">done</span>
+		} else {
+			<span class="badge open">pending</span>
+		}
+	</div>
+}

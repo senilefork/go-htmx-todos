@@ -1,0 +1,37 @@
+package layouts
+
+import "go-htmx-jobs/internal/templates/constants"
+
+// Index is the full HTML document — only rendered on first page load
+// (or when no HX-Target matches). Everything below { children... } gets
+// swapped by HTMX after that; the <head> stays put.
+templ Index() {
+	<!DOCTYPE html>
+	<html>
+		<head>
+			<title>Todos</title>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<link href="/public/css/style.css" rel="stylesheet"/>
+			<script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+		</head>
+		<body>
+			<div id={ constants.GlobalToastID }></div>
+			{ children... }
+			<script data-toast-id={ constants.GlobalToastID }>
+				// Surface server errors (returned as HTML with hx-toast: true)
+				// in the fixed toast container instead of dumping them on the page.
+				const toastId = document.currentScript.dataset.toastId;
+				document.body.addEventListener('htmx:responseError', (event) => {
+					const xhr = event.detail.xhr;
+					if (xhr.status >= 400 && xhr.getResponseHeader('hx-toast') === 'true') {
+						const box = document.getElementById(toastId);
+						if (!box) return;
+						box.innerHTML = xhr.response;
+						setTimeout(() => { box.innerHTML = ''; }, 4000);
+					}
+				});
+			</script>
+		</body>
+	</html>
+}

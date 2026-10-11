@@ -1,0 +1,29 @@
+package pages
+
+import (
+	"go-htmx-jobs/internal/templates/constants"
+	"go-htmx-jobs/internal/templates/ui/tables"
+	"go-htmx-jobs/pkg/model"
+)
+
+// Todos is the full list page. The search input targets #todos-table
+// only, so it keeps focus while HTMX swaps the table underneath it.
+templ Todos(todos []model.Todo, query string) {
+	<h1>Todos</h1>
+	<p class="subtitle">Live proxy for jsonplaceholder.typicode.com/todos — Go + HTMX, no JS framework.</p>
+	<div class="toolbar">
+		<input
+			type="search"
+			name="q"
+			placeholder="Search titles..."
+			value={ query }
+			hx-get="/todos"
+			hx-trigger="keyup changed delay:300ms"
+			hx-target={ "#" + constants.TodosTableID }
+			autocomplete="off"
+		/>
+	</div>
+	<div id={ constants.TodosTableID }>
+		@tables.TodosTable(todos)
+	</div>
+}

@@ -139,4 +139,3 @@ curl -s -H 'HX-Target: todos-table' 'http://localhost:9001/todos?q=delectus'  # 
    `internal/middlewares/auth.go` and `internal/builders/handler.go`.
 4. **Database persistence** — see the starter's `internal/database/`
    (DAOs, go-jet, migrations) to replace the HTTP upstream.
-# go-htmx-jobs

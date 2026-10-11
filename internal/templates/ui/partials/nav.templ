@@ -1,0 +1,18 @@
+package partials
+
+// Nav links are the HTMX navigation pattern in a nutshell:
+//   hx-get      -> fetch /todos instead of doing a full browser navigation
+//   hx-target   -> swap the response into #main-content only
+//   hx-push-url -> update the address bar so back/forward keep working
+templ Nav() {
+	<nav id="app-nav">
+		<span class="nav-brand">go/htmx todos</span>
+		<a
+			href="/todos"
+			hx-get="/todos"
+			hx-target="#main-content"
+			hx-push-url="true"
+			class="nav-link"
+		>Todos</a>
+	</nav>
+}

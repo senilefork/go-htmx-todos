@@ -1,0 +1,8 @@
+package partials
+
+// Toast is returned as the error response body for HTMX requests
+// (with the hx-toast header) and injected into #global-toast by the
+// listener in layouts.Index.
+templ Toast(message string) {
+	<div class="toast">{ message }</div>
+}

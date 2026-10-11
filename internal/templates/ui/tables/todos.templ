@@ -1,0 +1,46 @@
+package tables
+
+import (
+	"fmt"
+
+	"go-htmx-jobs/pkg/model"
+)
+
+// TodosTable is a fragment: no <html>, no layout — just the table.
+// Which wrapper (if any) goes around it is render.Layout's decision.
+templ TodosTable(todos []model.Todo) {
+	if len(todos) == 0 {
+		<p class="empty">No todos match your search.</p>
+	} else {
+		<table>
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>Title</th>
+					<th>User</th>
+					<th>Status</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, t := range todos {
+					<tr
+						hx-get={ fmt.Sprintf("/todos/%d", t.ID) }
+						hx-target="#main-content"
+						hx-push-url="true"
+					>
+						<td>{ t.ID }</td>
+						<td>{ t.Title }</td>
+						<td>{ t.UserID }</td>
+						<td>
+							if t.Completed {
+								<span class="badge closed">done</span>
+							} else {
+								<span class="badge open">pending</span>
+							}
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+}
