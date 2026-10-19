@@ -4,62 +4,74 @@ import (
 	gctx "context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
-	"os"
 
-	"go-htmx-jobs/internal/context"
+	"go-htmx-jobs/internal/builders"
+	"go-htmx-jobs/internal/cfg"
+	appctx "go-htmx-jobs/internal/context"
+	"go-htmx-jobs/internal/controllers/private"
 	"go-htmx-jobs/internal/controllers/public"
 	"go-htmx-jobs/internal/middlewares"
 
 	"github.com/go-chi/chi/v5"
 )
 
-// PublicRoute is the contract every public controller implements —
-// same shape as the starter's builders.AppPublicRoute: a mount path
-// plus a function that registers its sub-routes.
-type PublicRoute interface {
-	Path() string
-	PublicRoute(chi.Router)
-}
-
 type AppRouter struct {
-	public []PublicRoute
-	appCtx *context.AppContext
-	router chi.Router
+	public  []builders.AppPublicRoute
+	private []builders.AppPrivateRoute
+	addr    string
+	router  chi.Router
+	appCtx  *appctx.AppContext
 }
 
-func NewAppRouter(appCtx *context.AppContext) AppRouter {
+func NewAppRouter(appCtx *appctx.AppContext) AppRouter {
 	return AppRouter{
 		appCtx: appCtx,
-		public: []PublicRoute{
-			public.NewWebPublic(appCtx), // mount /public first...
-			public.NewTodos(appCtx),     // ...then "/" (the catch-all)
+		public: []builders.AppPublicRoute{
+			public.NewWebPublic(appCtx),
+			public.NewTodos(appCtx),
+			// INSERT PUBLIC
+		},
+		private: []builders.AppPrivateRoute{
+			private.NewDashboard(appCtx),
+			// INSERT PRIVATE
 		},
 	}
 }
 
 func (a *AppRouter) BuildRouter(ctx gctx.Context) {
+	lgr := appctx.GetLogger(ctx, "AppRouter.BuildRouter")
 	a.router = chi.NewRouter()
-	a.router.Use(middlewares.Recover)
+	a.router.Use(middlewares.Recover(ctx, a.appCtx))
 
-	for _, r := range a.public {
-		sub := chi.NewRouter()
-		r.PublicRoute(sub)
-		a.router.Mount(r.Path(), sub)
-		slog.Info("mounted route", "path", r.Path())
-	}
+	// Public group (no auth enforcement)
+	a.router.Group(func(g chi.Router) {
+		g.Use(middlewares.Auth(a.appCtx, false))
+		for _, r := range a.public {
+			router := chi.NewRouter()
+			r.PublicRoute(router)
+			g.Mount(r.Path(), router)
+			lgr.Info("mounted public", "path", r.Path())
+		}
+	})
+
+	// Private group (auth enforced)
+	a.router.Group(func(g chi.Router) {
+		g.Use(middlewares.Auth(a.appCtx, true))
+		for _, r := range a.private {
+			builder := builders.NewPrivateRouteBuilder(a.appCtx)
+			r.PrivateRoute(ctx, &builder)
+			g.Mount(r.Path(), builder.RawRouter())
+			lgr.Info("mounted private", "path", r.Path())
+		}
+	})
 }
 
-func (a *AppRouter) Start() error {
+func (a *AppRouter) Start(cfg cfg.Config) error {
 	if a.router == nil {
-		return errors.New("AppRouter has no router: did you forget to call BuildRouter?")
+		return errors.New("AppRouter has no router. Did you forget to call BuildRouter?")
 	}
-
-	addr := ":9001" // override with PORT=...
-	if p := os.Getenv("PORT"); p != "" {
-		addr = ":" + p
-	}
-	fmt.Printf("\nListening on http://localhost%s\n", addr)
-	return http.ListenAndServe(addr, a.router)
+	a.addr = fmt.Sprintf("%v:%v", cfg.Host, cfg.Port)
+	fmt.Printf("\nListening on http://%s\n", a.addr)
+	return http.ListenAndServe(a.addr, a.router)
 }

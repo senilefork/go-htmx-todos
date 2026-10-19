@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"go-htmx-jobs/internal/cfg"
 	"go-htmx-jobs/internal/context"
 	"go-htmx-jobs/internal/router"
 	"go-htmx-jobs/internal/services"
@@ -30,7 +31,7 @@ func web() {
 	appRouter := router.NewAppRouter(appCtx)
 	appRouter.BuildRouter(ctx)
 
-	if err := appRouter.Start(); err != nil {
+	if err := appRouter.Start(cfg.Load()); err != nil {
 		slog.Error("failed to start router", "error", err)
 		os.Exit(1)
 	}
