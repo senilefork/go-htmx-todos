@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS roles_privileges;
+DROP TABLE IF EXISTS privileges;
+DROP TABLE IF EXISTS roles;

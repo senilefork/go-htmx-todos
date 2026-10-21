@@ -11,14 +11,16 @@ import (
 	appctx "go-htmx-jobs/internal/context"
 )
 
-// Recover wraps every request: it recovers panics -> 500, and injects a
-// logger carrying a random request id into the context.
+// Recover wraps every request: it recovers panics -> 500, injects a
+// logger carrying a random request id into the context, and copies the
+// startup database handle onto the request context.
 func Recover(ctx gctx.Context, appCtx *appctx.AppContext) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reqID := newRequestID()
 			lgr := slog.Default().With("req_id", reqID)
 			reqCtx := appctx.WithLogger(r.Context(), lgr)
+			reqCtx = appctx.WithDB(reqCtx, appctx.GetDB(ctx))
 
 			defer func() {
 				if rec := recover(); rec != nil {

@@ -1,0 +1,19 @@
+services:
+  jobs_db:
+    container_name: go_jobs_db
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_EXTERNAL_PORT}:${DB_PORT}"
+    volumes:
+      - pgdata_jobs:/var/lib/postgresql/18/docker
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_NAME}"]
+      interval: 2s
+      retries: 3
+
+volumes:
+  pgdata_jobs:
