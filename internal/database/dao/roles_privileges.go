@@ -1,52 +1,68 @@
 package dao
 
 import (
-	gctx "context"
-	"errors"
-	"fmt"
+	"time"
 
-	appctx "go-htmx-jobs/internal/context"
+	"go-htmx-jobs/internal/context"
+	"go-htmx-jobs/internal/database/gen/go_jobs_db/public/table"
+	dbmodel "go-htmx-jobs/pkg/db/public/model"
 	"go-htmx-jobs/pkg/model"
+	"github.com/go-jet/jet/v2/postgres"
 )
 
-type rolesPrivilegesDAO struct{}
+type rolesPrivilegesDAO struct {
+	context.DAOBaseQueries[model.RolesPrivilegesPrimaryKey, dbmodel.RolesPrivileges]
+}
 
-// GetMany returns the join rows matching any of the composite keys —
-// "does this role hold at least one of these privileges" is then just
-// len(rows) > 0, same as the starter's HasPermissionsByIDS.
-func (d *rolesPrivilegesDAO) GetMany(ctx gctx.Context, pks []model.RolesPrivilegesPrimaryKey) ([]model.RolesPrivilege, error) {
-	if len(pks) == 0 {
-		return nil, nil
+func NewRolesPrivilegesDAO() *rolesPrivilegesDAO {
+	dao := &rolesPrivilegesDAO{
+		DAOBaseQueries: nil,
 	}
+	queries := newDAOQueryable[model.RolesPrivilegesPrimaryKey, dbmodel.RolesPrivileges](dao)
+	dao.DAOBaseQueries = &queries
+	return dao
+}
 
-	where := ""
-	args := make([]any, 0, len(pks)*2)
-	for i, pk := range pks {
-		if i > 0 {
-			where += " OR "
-		}
-		where += fmt.Sprintf("(role_id = $%d AND privilege_id = $%d)", i*2+1, i*2+2)
-		args = append(args, pk.RoleID, pk.PrivilegeID)
-	}
+func (dao *rolesPrivilegesDAO) Table() context.PostgresTable {
+	return table.RolesPrivileges
+}
 
-	rows, err := appctx.GetDB(ctx).QueryContext(ctx,
-		`SELECT role_id, privilege_id, created_at
-		 FROM roles_privileges
-		 WHERE `+where,
-		args...,
+func (dao *rolesPrivilegesDAO) InsertCols() postgres.ColumnList {
+	return table.RolesPrivileges.AllColumns.Except(
+		table.RolesPrivileges.CreatedAt,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("get roles_privileges: %w", err)
-	}
-	defer rows.Close()
+}
 
-	var out []model.RolesPrivilege
-	for rows.Next() {
-		var rp model.RolesPrivilege
-		if err := rows.Scan(&rp.RoleID, &rp.PrivilegeID, &rp.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan roles_privilege: %w", err)
-		}
-		out = append(out, rp)
+func (dao *rolesPrivilegesDAO) UpdateCols() postgres.ColumnList {
+	return table.RolesPrivileges.AllColumns.Except(
+		table.RolesPrivileges.CreatedAt,
+	)
+}
+
+func (dao *rolesPrivilegesDAO) AllCols() postgres.ColumnList {
+	return table.RolesPrivileges.AllColumns
+}
+
+func (dao *rolesPrivilegesDAO) OnConflictCols() postgres.ColumnList {
+	return []postgres.Column{
+		table.RolesPrivileges.RoleID,
+		table.RolesPrivileges.PrivilegeID,
 	}
-	return out, errors.Join(rows.Err())
+}
+
+func (dao *rolesPrivilegesDAO) UpdateOnConflictCols() []postgres.ColumnAssigment {
+	return []postgres.ColumnAssigment{
+		table.RolesPrivileges.RoleID.SET(table.RolesPrivileges.EXCLUDED.RoleID),
+		table.RolesPrivileges.PrivilegeID.SET(table.RolesPrivileges.EXCLUDED.PrivilegeID),
+	}
+}
+
+func (dao *rolesPrivilegesDAO) PKMatch(pk model.RolesPrivilegesPrimaryKey) postgres.BoolExpression {
+	return table.RolesPrivileges.
+		RoleID.EQ(postgres.Int16(pk.RoleID)).
+		AND(table.RolesPrivileges.PrivilegeID.EQ(postgres.Int(pk.PrivilegeID)))
+}
+
+func (dao *rolesPrivilegesDAO) GetUpdatedAt(row *dbmodel.RolesPrivileges) *time.Time {
+	return nil
 }

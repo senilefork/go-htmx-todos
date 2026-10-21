@@ -9,9 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-jet/jet/v2/qrm"
+	_ "github.com/lib/pq"
 	"github.com/joho/godotenv"
 
 	appctx "go-htmx-jobs/internal/context"
+	dbmodel "go-htmx-jobs/pkg/db/public/model"
 	"go-htmx-jobs/pkg/model"
 )
 
@@ -39,7 +42,7 @@ func TestSessionsRoundTrip(t *testing.T) {
 	})
 
 	exp := time.Now().Add(time.Hour)
-	if err := dm.SessionsDAO().Insert(ctx, &model.Sessions{
+	if err := dm.SessionsDAO().Insert(ctx, &dbmodel.Sessions{
 		OktaSub: pk.OktaSub, Token: pk.AuthToken, ExpiresAt: &exp,
 	}); err != nil {
 		t.Fatalf("insert: %v", err)
@@ -56,8 +59,8 @@ func TestSessionsRoundTrip(t *testing.T) {
 	if err := dm.SessionsDAO().Delete(ctx, pk); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	if _, err := dm.SessionsDAO().GetOne(ctx, pk); !errors.Is(err, sql.ErrNoRows) {
-		t.Fatalf("want sql.ErrNoRows after delete, got %v", err)
+	if _, err := dm.SessionsDAO().GetOne(ctx, pk); !errors.Is(err, qrm.ErrNoRows) {
+		t.Fatalf("want qrm.ErrNoRows after delete, got %v", err)
 	}
 }
 

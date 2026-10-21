@@ -1,51 +1,64 @@
 package dao
 
 import (
-	gctx "context"
-	"fmt"
+	"time"
 
-	appctx "go-htmx-jobs/internal/context"
+	"go-htmx-jobs/internal/context"
+	"go-htmx-jobs/internal/database/gen/go_jobs_db/public/table"
+	dbmodel "go-htmx-jobs/pkg/db/public/model"
 	"go-htmx-jobs/pkg/model"
+	"github.com/go-jet/jet/v2/postgres"
 )
 
-type sessionsDAO struct{}
-
-func (d *sessionsDAO) Insert(ctx gctx.Context, m *model.Sessions) error {
-	_, err := appctx.GetDB(ctx).ExecContext(ctx,
-		`INSERT INTO sessions (okta_sub, token, expires_at)
-		 VALUES ($1, $2, $3)`,
-		m.OktaSub, m.Token, m.ExpiresAt,
-	)
-	if err != nil {
-		return fmt.Errorf("insert session: %w", err)
-	}
-	return nil
+type sessionsDAO struct {
+	context.DAOBaseQueries[model.SessionsPrimaryKey, dbmodel.Sessions]
 }
 
-// GetOne returns the session matching both halves of the composite PK.
-// sql.ErrNoRows passes through unwrapped so callers can
-// errors.Is(err, sql.ErrNoRows) — an absent session means "not logged in".
-func (d *sessionsDAO) GetOne(ctx gctx.Context, pk model.SessionsPrimaryKey) (*model.Sessions, error) {
-	row := appctx.GetDB(ctx).QueryRowContext(ctx,
-		`SELECT okta_sub, token, expires_at, created_at
-		 FROM sessions
-		 WHERE okta_sub = $1 AND token = $2`,
-		pk.OktaSub, pk.AuthToken,
-	)
-	m := &model.Sessions{}
-	if err := row.Scan(&m.OktaSub, &m.Token, &m.ExpiresAt, &m.CreatedAt); err != nil {
-		return nil, err
+func NewSessionsDAO() *sessionsDAO {
+	dao := &sessionsDAO{
+		DAOBaseQueries: nil,
 	}
-	return m, nil
+	queries := newDAOQueryable[model.SessionsPrimaryKey, dbmodel.Sessions](dao)
+	dao.DAOBaseQueries = &queries
+	return dao
 }
 
-func (d *sessionsDAO) Delete(ctx gctx.Context, pk model.SessionsPrimaryKey) error {
-	_, err := appctx.GetDB(ctx).ExecContext(ctx,
-		`DELETE FROM sessions WHERE okta_sub = $1 AND token = $2`,
-		pk.OktaSub, pk.AuthToken,
+func (dao *sessionsDAO) Table() context.PostgresTable {
+	return table.Sessions
+}
+
+func (dao *sessionsDAO) InsertCols() postgres.ColumnList {
+	return table.Sessions.AllColumns.Except(
+		table.Sessions.CreatedAt,
 	)
-	if err != nil {
-		return fmt.Errorf("delete session: %w", err)
-	}
+}
+
+func (dao *sessionsDAO) UpdateCols() postgres.ColumnList {
+	return table.Sessions.AllColumns.Except(
+		table.Sessions.CreatedAt,
+		table.Sessions.OktaSub,
+		table.Sessions.Token,
+	)
+}
+
+func (dao *sessionsDAO) AllCols() postgres.ColumnList {
+	return table.Sessions.AllColumns
+}
+
+func (dao *sessionsDAO) OnConflictCols() postgres.ColumnList {
+	return []postgres.Column{}
+}
+
+func (dao *sessionsDAO) UpdateOnConflictCols() []postgres.ColumnAssigment {
+	return []postgres.ColumnAssigment{}
+}
+
+func (dao *sessionsDAO) PKMatch(pk model.SessionsPrimaryKey) postgres.BoolExpression {
+	return table.Sessions.
+		OktaSub.EQ(postgres.String(pk.OktaSub)).
+		AND(table.Sessions.Token.EQ(postgres.String(pk.AuthToken)))
+}
+
+func (dao *sessionsDAO) GetUpdatedAt(row *dbmodel.Sessions) *time.Time {
 	return nil
 }

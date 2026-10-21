@@ -1,22 +1,44 @@
 package dao
 
-import appctx "go-htmx-jobs/internal/context"
+import (
+	appctx "go-htmx-jobs/internal/context"
+)
 
-// Manager hands out the DAO singletons. DAOs are stateless — the pool
-// comes from ctx on every call — so there's nothing to configure; the
-// struct exists to own the instances and satisfy appctx.DAOManager.
-type Manager struct {
-	sessions        sessionsDAO
-	userRoles       userRolesDAO
-	privileges      privilegesDAO
-	rolesPrivileges rolesPrivilegesDAO
+type daoManager struct {
+	sessionsDAO        appctx.SessionsDAO
+	userRolesDAO       appctx.UserRolesDAO
+	privilegesDAO      appctx.PrivilegesDAO
+	rolesPrivilegesDAO appctx.RolesPrivilegesDAO
 }
 
-func NewDAOManager() *Manager {
-	return &Manager{}
+func NewDAOManager() appctx.DAOManager {
+	return &daoManager{}
 }
 
-func (m *Manager) SessionsDAO() appctx.SessionsDAO             { return &m.sessions }
-func (m *Manager) UserRolesDAO() appctx.UserRolesDAO           { return &m.userRoles }
-func (m *Manager) PrivilegesDAO() appctx.PrivilegesDAO         { return &m.privileges }
-func (m *Manager) RolesPrivilegesDAO() appctx.RolesPrivilegesDAO { return &m.rolesPrivileges }
+func (dm *daoManager) SessionsDAO() appctx.SessionsDAO {
+	if dm.sessionsDAO == nil {
+		dm.sessionsDAO = NewSessionsDAO()
+	}
+	return dm.sessionsDAO
+}
+
+func (dm *daoManager) UserRolesDAO() appctx.UserRolesDAO {
+	if dm.userRolesDAO == nil {
+		dm.userRolesDAO = NewUserRolesDAO()
+	}
+	return dm.userRolesDAO
+}
+
+func (dm *daoManager) PrivilegesDAO() appctx.PrivilegesDAO {
+	if dm.privilegesDAO == nil {
+		dm.privilegesDAO = NewPrivilegesDAO()
+	}
+	return dm.privilegesDAO
+}
+
+func (dm *daoManager) RolesPrivilegesDAO() appctx.RolesPrivilegesDAO {
+	if dm.rolesPrivilegesDAO == nil {
+		dm.rolesPrivilegesDAO = NewRolesPrivilegesDAO()
+	}
+	return dm.rolesPrivilegesDAO
+}

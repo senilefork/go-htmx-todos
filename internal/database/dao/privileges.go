@@ -2,83 +2,88 @@ package dao
 
 import (
 	gctx "context"
-	"fmt"
+	"time"
 
-	"github.com/lib/pq"
-
-	appctx "go-htmx-jobs/internal/context"
 	"go-htmx-jobs/internal/constant"
-	"go-htmx-jobs/pkg/model"
+	"go-htmx-jobs/internal/context"
+	"go-htmx-jobs/internal/database/gen/go_jobs_db/public/table"
+	dbmodel "go-htmx-jobs/pkg/db/public/model"
+	"github.com/go-jet/jet/v2/postgres"
 )
 
-type privilegesDAO struct{}
-
-// GetManyByName fetches privileges whose names are in the slice. ANY($1)
-// with a pq.Array beats building $1..$n placeholders by hand — the slice
-// binds as a Postgres text[] in one round trip.
-func (d *privilegesDAO) GetManyByName(ctx gctx.Context, names []constant.PrivilegeName) ([]model.Privilege, error) {
-	if len(names) == 0 {
-		return nil, nil
-	}
-	strs := make([]string, len(names))
-	for i, n := range names {
-		strs[i] = string(n)
-	}
-
-	rows, err := appctx.GetDB(ctx).QueryContext(ctx,
-		`SELECT id, name, created_at, updated_at
-		 FROM privileges
-		 WHERE name = ANY($1)`,
-		pq.Array(strs),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("get privileges by name: %w", err)
-	}
-	defer rows.Close()
-
-	var out []model.Privilege
-	for rows.Next() {
-		var p model.Privilege
-		if err := rows.Scan(&p.ID, &p.Name, &p.CreatedAt, &p.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan privilege: %w", err)
-		}
-		out = append(out, p)
-	}
-	return out, rows.Err()
+type privilegesDAO struct {
+	context.DAOBaseQueries[int64, dbmodel.Privileges]
 }
 
-// UpsertMany inserts any names not yet present and returns the full set
-// with ids — existing rows come back via the ON CONFLICT no-op update,
-// which forces RETURNING to fire for them too.
-func (d *privilegesDAO) UpsertMany(ctx gctx.Context, privileges []model.Privilege) ([]model.Privilege, error) {
-	if len(privileges) == 0 {
-		return nil, nil
+func NewPrivilegesDAO() *privilegesDAO {
+	dao := &privilegesDAO{
+		DAOBaseQueries: nil,
 	}
-	names := make([]string, len(privileges))
-	for i, p := range privileges {
-		names[i] = p.Name
-	}
+	queries := newDAOQueryable[int64, dbmodel.Privileges](dao)
+	dao.DAOBaseQueries = &queries
+	return dao
+}
 
-	rows, err := appctx.GetDB(ctx).QueryContext(ctx,
-		`INSERT INTO privileges (name)
-		 SELECT * FROM UNNEST($1::text[])
-		 ON CONFLICT (name)
-		 DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-		 RETURNING id, name, created_at, updated_at`,
-		pq.Array(names),
+func (dao *privilegesDAO) Table() context.PostgresTable {
+	return table.Privileges
+}
+
+func (dao *privilegesDAO) InsertCols() postgres.ColumnList {
+	return table.Privileges.AllColumns.Except(
+		table.Privileges.ID,
+		table.Privileges.CreatedAt,
+		table.Privileges.UpdatedAt,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("upsert privileges: %w", err)
-	}
-	defer rows.Close()
+}
 
-	var out []model.Privilege
-	for rows.Next() {
-		var p model.Privilege
-		if err := rows.Scan(&p.ID, &p.Name, &p.CreatedAt, &p.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan privilege: %w", err)
-		}
-		out = append(out, p)
+func (dao *privilegesDAO) UpdateCols() postgres.ColumnList {
+	return table.Privileges.AllColumns.Except(
+		table.Privileges.ID,
+		table.Privileges.CreatedAt,
+	)
+}
+
+func (dao *privilegesDAO) AllCols() postgres.ColumnList {
+	return table.Privileges.AllColumns
+}
+
+func (dao *privilegesDAO) OnConflictCols() postgres.ColumnList {
+	return []postgres.Column{table.Privileges.Name}
+}
+
+func (dao *privilegesDAO) UpdateOnConflictCols() []postgres.ColumnAssigment {
+	return []postgres.ColumnAssigment{
+		table.Privileges.Name.SET(table.Privileges.EXCLUDED.Name),
 	}
-	return out, rows.Err()
+}
+
+func (dao *privilegesDAO) PKMatch(pk int64) postgres.BoolExpression {
+	return table.Privileges.ID.EQ(postgres.Int(pk))
+}
+
+func (dao *privilegesDAO) GetUpdatedAt(row *dbmodel.Privileges) *time.Time {
+	return row.UpdatedAt
+}
+
+func (dao *privilegesDAO) GetManyByName(ctx gctx.Context, names []constant.PrivilegeName) ([]dbmodel.Privileges, error) {
+	var privileges []dbmodel.Privileges
+
+	if len(names) == 0 {
+		return privileges, nil
+	}
+
+	exprs := make([]postgres.Expression, len(names))
+	for i, name := range names {
+		exprs[i] = postgres.String(string(name))
+	}
+
+	err := table.Privileges.
+		SELECT(table.Privileges.AllColumns).
+		WHERE(table.Privileges.Name.IN(exprs...)).
+		QueryContext(ctx, context.GetDB(ctx), &privileges)
+	if err != nil {
+		return nil, err
+	}
+
+	return privileges, nil
 }

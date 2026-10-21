@@ -1,43 +1,65 @@
 package dao
 
 import (
-	gctx "context"
-	"fmt"
+	"time"
 
-	appctx "go-htmx-jobs/internal/context"
-	"go-htmx-jobs/pkg/model"
+	"go-htmx-jobs/internal/context"
+	"go-htmx-jobs/internal/database/gen/go_jobs_db/public/table"
+	dbmodel "go-htmx-jobs/pkg/db/public/model"
+	"github.com/go-jet/jet/v2/postgres"
 )
 
-type userRolesDAO struct{}
-
-func (d *userRolesDAO) GetOne(ctx gctx.Context, oktaSub string) (*model.UserRole, error) {
-	row := appctx.GetDB(ctx).QueryRowContext(ctx,
-		`SELECT okta_sub, role_id, created_at, updated_at
-		 FROM user_roles
-		 WHERE okta_sub = $1`,
-		oktaSub,
-	)
-	m := &model.UserRole{}
-	if err := row.Scan(&m.OktaSub, &m.RoleID, &m.CreatedAt, &m.UpdatedAt); err != nil {
-		return nil, err
-	}
-	return m, nil
+type userRolesDAO struct {
+	context.DAOBaseQueries[string, dbmodel.UserRoles]
 }
 
-// Upsert assigns (or reassigns) the role for a subject. The no-op-write
-// ON CONFLICT form keeps it one round trip; updated_at is touched so a
-// reassignment is visible in the data.
-func (d *userRolesDAO) Upsert(ctx gctx.Context, m *model.UserRole) error {
-	_, err := appctx.GetDB(ctx).ExecContext(ctx,
-		`INSERT INTO user_roles (okta_sub, role_id)
-		 VALUES ($1, $2)
-		 ON CONFLICT (okta_sub)
-		 DO UPDATE SET role_id = EXCLUDED.role_id,
-		               updated_at = CURRENT_TIMESTAMP`,
-		m.OktaSub, m.RoleID,
-	)
-	if err != nil {
-		return fmt.Errorf("upsert user role: %w", err)
+func NewUserRolesDAO() *userRolesDAO {
+	dao := &userRolesDAO{
+		DAOBaseQueries: nil,
 	}
-	return nil
+	queries := newDAOQueryable[string, dbmodel.UserRoles](dao)
+	dao.DAOBaseQueries = &queries
+	return dao
+}
+
+func (dao *userRolesDAO) Table() context.PostgresTable {
+	return table.UserRoles
+}
+
+func (dao *userRolesDAO) InsertCols() postgres.ColumnList {
+	return table.UserRoles.AllColumns.Except(
+		table.UserRoles.CreatedAt,
+		table.UserRoles.UpdatedAt,
+	)
+}
+
+func (dao *userRolesDAO) UpdateCols() postgres.ColumnList {
+	return table.UserRoles.AllColumns.Except(
+		table.UserRoles.CreatedAt,
+		table.UserRoles.UpdatedAt,
+		table.UserRoles.OktaSub,
+	)
+}
+
+func (dao *userRolesDAO) AllCols() postgres.ColumnList {
+	return table.UserRoles.AllColumns
+}
+
+func (dao *userRolesDAO) OnConflictCols() postgres.ColumnList {
+	return []postgres.Column{table.UserRoles.OktaSub}
+}
+
+func (dao *userRolesDAO) UpdateOnConflictCols() []postgres.ColumnAssigment {
+	return []postgres.ColumnAssigment{
+		table.UserRoles.RoleID.SET(table.UserRoles.EXCLUDED.RoleID),
+		table.UserRoles.UpdatedAt.SET(table.UserRoles.EXCLUDED.UpdatedAt),
+	}
+}
+
+func (dao *userRolesDAO) PKMatch(pk string) postgres.BoolExpression {
+	return table.UserRoles.OktaSub.EQ(postgres.String(pk))
+}
+
+func (dao *userRolesDAO) GetUpdatedAt(row *dbmodel.UserRoles) *time.Time {
+	return row.UpdatedAt
 }

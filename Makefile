@@ -18,6 +18,7 @@ vet:
 include .env
 
 MIGRATE_CMD := $(HOME)/go/bin/migrate
+JET_CMD := $(HOME)/go/bin/jet
 DB_URL := postgres://$(DB_USER):$(DB_PASSWORD)@localhost:$(DB_EXTERNAL_PORT)/$(DB_NAME)?sslmode=disable
 
 migrate:
@@ -35,3 +36,8 @@ migrate-version:
 migrate-create:
 	@read -p "Enter migration name: " name; \
 	$(MIGRATE_CMD) create -ext sql -dir migrations -seq $$name
+
+jet-generate:
+	$(JET_CMD) -dsn=$(DB_URL) -schema=public -ignore-tables=schema_migrations \
+		-path=./internal/database/gen \
+		-rel-model-path=../../../../../pkg/db/public/model
